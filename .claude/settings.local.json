@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:watermelondb.dev)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.yassine.blog)",
+      "WebFetch(domain:www.themorrow.digital)",
+      "WebFetch(domain:expo.dev)",
+      "Bash(cd /c/Users/ZBOOK/Desktop/travel_ravers && npx create-expo-app@latest . --template tabs 2>&1212111111111111)",
+      "Bash(mkdir -p /c/Users/ZBOOK/Desktop/_tr_scaffold && cd /c/Users/ZBOOK/Desktop/_tr_scaffold && npx create-expo-app@latest . --template tabs 2>&1)",
+      "Bash(grep:*)",
+      "Bash(cd:*)",
+      "Bash(cd /c/Users/ZBOOK/Desktop/travel_ravers && npx tsc --noEmit 2>&1)",
+      "Bash(ls:*)",
+      "Bash(test:*)"
+    ]
+  }
+}
