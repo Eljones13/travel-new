@@ -31,6 +31,36 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="festivals"
+        options={{
+          title: 'Festivals',
+          headerTitle: 'Festival Map',
+          tabBarIcon: ({ color }) => (
+            <FontAwesome name="map-marker" size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="schedule"
+        options={{
+          title: 'Schedule',
+          headerTitle: 'Rave Radar',
+          tabBarIcon: ({ color }) => (
+            <FontAwesome name="calendar" size={22} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="squad"
+        options={{
+          title: 'Squad',
+          headerTitle: 'Squad Sync',
+          tabBarIcon: ({ color }) => (
+            <FontAwesome name="users" size={22} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

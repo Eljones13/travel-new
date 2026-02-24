@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Linking,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { withObservables, useDatabase } from '@nozbe/watermelondb/react';
@@ -31,6 +32,15 @@ const PackingItemRowBase = ({ item }: RowBaseProps) => {
     });
   }, [item, db]);
 
+  const openAffiliate = useCallback(() => {
+    if (!item.affiliateUrl) return;
+    if (Platform.OS === 'web') {
+      window.open(item.affiliateUrl, '_blank', 'noopener,noreferrer');
+    } else {
+      Linking.openURL(item.affiliateUrl);
+    }
+  }, [item.affiliateUrl]);
+
   return (
     <TouchableOpacity style={styles.row} onPress={togglePacked} activeOpacity={0.7}>
       <View style={[styles.checkbox, item.isPacked && styles.checkboxChecked]}>
@@ -46,7 +56,19 @@ const PackingItemRowBase = ({ item }: RowBaseProps) => {
         {item.weatherTrigger !== 'none' ? (
           <Text style={styles.weatherBadge}>{item.weatherTrigger.replace('_', ' ')}</Text>
         ) : null}
+        {item.assignedTo ? (
+          <Text style={styles.assignedTo}>→ {item.assignedTo}</Text>
+        ) : null}
       </View>
+      {item.affiliateUrl ? (
+        <TouchableOpacity
+          style={styles.cartButton}
+          onPress={openAffiliate}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={styles.cartIcon}>🛒</Text>
+        </TouchableOpacity>
+      ) : null}
     </TouchableOpacity>
   );
 };
@@ -245,6 +267,20 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  assignedTo: {
+    color: '#FF00FF',
+    fontSize: 11,
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  cartButton: {
+    paddingLeft: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cartIcon: {
+    fontSize: 18,
   },
   emptyText: {
     color: '#555',
