@@ -14,6 +14,7 @@ import { database } from '../../src/db';
 import { Stage } from '../../src/models/Stage';
 import { Performance } from '../../src/models/Performance';
 import { SquadSession } from '../../src/models/SquadSession';
+import { COLORS, GLASS_STYLE, TYPOGRAPHY } from '../../src/constants/Theme';
 
 // ── Survival Tips — injected as banners at specific Bangkok-hour windows ───────
 
@@ -65,6 +66,14 @@ function formatTime(ms: number): string {
   return `${displayH}:${m.toString().padStart(2, '0')} ${ampm}`;
 }
 
+// 24-hr tactical clock — "21:00"
+function formatTime24(ms: number): string {
+  const d = new Date(ms + 7 * 3600 * 1000);
+  const h = d.getUTCHours().toString().padStart(2, '0');
+  const m = d.getUTCMinutes().toString().padStart(2, '0');
+  return `${h}:${m}`;
+}
+
 function timeAgo(ms: number): string {
   const diff = Math.floor((Date.now() - ms) / 1000);
   if (diff < 60) return 'just now';
@@ -102,37 +111,52 @@ function SurvivalTipBanner({ tip }: { tip: SurvivalTip }) {
   );
 }
 
-// ── Performance card ──────────────────────────────────────────────────────────
+// ── Performance Card ───────────────────────────────────────────────────────────
+// isHeadliner is derived from perf.genre === 'Headliner' at the call site.
 
-type PerfCardProps = { perf: Performance; isLive: boolean; color: string };
+type PerfCardProps = { perf: Performance; isLive: boolean; color: string; isHeadliner: boolean };
 
-function PerformanceCard({ perf, isLive, color }: PerfCardProps) {
+function PerformanceCard({ perf, isLive, color, isHeadliner }: PerfCardProps) {
+  const accentColor = isHeadliner ? COLORS.magenta : color;
+  const trackColor = isLive || isHeadliner ? accentColor : COLORS.glassBorder;
+
   return (
     <View
       style={[
         styles.perfCard,
-        isLive && {
-          backgroundColor: color + '10',
-          borderRadius: 10,
-          borderBottomColor: 'transparent',
-        },
+        { borderLeftColor: trackColor },
+        isHeadliner && styles.perfCardHeadliner,
+        isLive && { backgroundColor: accentColor + '15' },
       ]}
     >
+      {/* Monospaced tactical time column */}
       <View style={styles.perfTime}>
-        <Text style={[styles.perfTimeText, isLive && { color }]}>
-          {formatTime(perf.startTime)}
+        <Text style={[styles.perfTimeText, (isLive || isHeadliner) && { color: accentColor }]}>
+          {formatTime24(perf.startTime)}
         </Text>
-        {isLive && <View style={[styles.liveDot, { backgroundColor: color }]} />}
+        {isLive && <View style={[styles.liveDot, { backgroundColor: accentColor }]} />}
       </View>
+
       <View style={styles.perfInfo}>
-        <Text style={[styles.perfArtist, isLive && { color: '#FFFFFF' }]}>{perf.artist}</Text>
-        <Text style={styles.perfDuration}>
-          {formatTime(perf.startTime)} – {formatTime(perf.endTime)}
+        <Text
+          style={[
+            styles.perfArtist,
+            isHeadliner && styles.perfArtistHeadliner,
+            isLive && { color: COLORS.textPrimary },
+          ]}
+        >
+          {perf.artist}
         </Text>
+        {/* Monospaced duration readout */}
+        <Text style={styles.perfDuration}>
+          {formatTime24(perf.startTime)}–{formatTime24(perf.endTime)}
+        </Text>
+        {isHeadliner && <Text style={styles.headlinerLabel}>◆ HEADLINER</Text>}
       </View>
+
       {isLive && (
-        <View style={[styles.liveBadge, { backgroundColor: color + '25', borderColor: color + '60' }]}>
-          <Text style={[styles.liveBadgeText, { color }]}>LIVE</Text>
+        <View style={[styles.liveBadge, { backgroundColor: accentColor + '25', borderColor: accentColor + '60' }]}>
+          <Text style={[styles.liveBadgeText, { color: accentColor }]}>LIVE</Text>
         </View>
       )}
     </View>
@@ -232,7 +256,7 @@ function ScheduleScreenBase({ stages, performances, sessions }: ScreenBaseProps)
                 styles.stageChip,
                 isSelected
                   ? { borderColor: sc, backgroundColor: sc + '22' }
-                  : { borderColor: '#2A2A2A', backgroundColor: '#1A1A1A' },
+                  : { borderColor: COLORS.glassBorder, backgroundColor: COLORS.surface },
               ]}
               onPress={() => setSelectedStageId(stage.id)}
               activeOpacity={0.75}
@@ -267,6 +291,7 @@ function ScheduleScreenBase({ stages, performances, sessions }: ScreenBaseProps)
       <ScrollView style={styles.timeline} contentContainerStyle={styles.timelineContent}>
         {stagePerformances.map((perf, i) => {
           const isLive = now >= perf.startTime && now < perf.endTime;
+          const isHeadliner = perf.genre?.toLowerCase() === 'headliner';
           const tip = getTipForSlot(perf.startTime);
           const showTip =
             tip !== null &&
@@ -276,7 +301,7 @@ function ScheduleScreenBase({ stages, performances, sessions }: ScreenBaseProps)
           return (
             <React.Fragment key={perf.id}>
               {showTip && <SurvivalTipBanner tip={tip!} />}
-              <PerformanceCard perf={perf} isLive={isLive} color={color} />
+              <PerformanceCard perf={perf} isLive={isLive} color={color} isHeadliner={isHeadliner} />
             </React.Fragment>
           );
         })}
@@ -307,31 +332,39 @@ export default function ScheduleScreen() {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D0D0D' },
+  container: { flex: 1, backgroundColor: COLORS.background },
   // Empty state
   empty: {
     flex: 1,
-    backgroundColor: '#0D0D0D',
+    backgroundColor: COLORS.background,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
   },
   emptyIcon: { fontSize: 48 },
-  emptyTitle: { color: '#FFF', fontSize: 20, fontWeight: '700' },
-  emptySub: { color: '#555', fontSize: 13 },
-  // Festival bar
+  emptyTitle: { color: COLORS.textPrimary, fontSize: 20, fontWeight: '700' },
+  emptySub: { color: COLORS.textSecondary, fontSize: 13 },
+  // Festival bar — tactical header strip
   festivalBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: '#1A1A1A',
-    borderBottomWidth: 1,
-    borderBottomColor: '#2A2A2A',
+    backgroundColor: COLORS.surface,
+    borderBottomWidth: 0.5,
+    borderBottomColor: COLORS.glassBorder,
   },
-  festivalLabel: { color: '#FF6B35', fontSize: 12, fontWeight: '800', letterSpacing: 1.5 },
-  festivalDate: { color: '#555', fontSize: 11, fontWeight: '600', letterSpacing: 1 },
+  festivalLabel: {
+    color: COLORS.cyan,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+  },
+  festivalDate: {
+    ...TYPOGRAPHY.monoSm,
+    color: COLORS.textSecondary,
+  },
   // Radar banner
   radarBanner: {
     flexDirection: 'row',
@@ -339,14 +372,14 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: '#FFFFFF08',
-    borderBottomWidth: 1,
-    borderBottomColor: '#2A2A2A',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderBottomWidth: 0.5,
+    borderBottomColor: COLORS.glassBorder,
   },
   radarIcon: { fontSize: 13 },
   radarText: { fontSize: 12, color: '#999' },
   radarStage: { fontWeight: '700' },
-  radarTime: { color: '#555', fontSize: 11 },
+  radarTime: { ...TYPOGRAPHY.monoSm, color: COLORS.textSecondary },
   // Stage picker
   stagePicker: { maxHeight: 56, flexGrow: 0 },
   stagePickerContent: {
@@ -359,12 +392,12 @@ const styles = StyleSheet.create({
   stageChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: 0.5,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 6,
   },
-  stageChipText: { color: '#666', fontSize: 12, fontWeight: '600' },
+  stageChipText: { color: COLORS.textSecondary, fontSize: 12, fontWeight: '600' },
   // I Am Here button
   checkInBtn: {
     marginHorizontal: 16,
@@ -377,24 +410,41 @@ const styles = StyleSheet.create({
   checkInBtnText: { fontWeight: '800', fontSize: 14, letterSpacing: 0.5 },
   // Timeline
   timeline: { flex: 1 },
-  timelineContent: { padding: 16 },
-  // Performance card
+  timelineContent: { paddingVertical: 8 },
+  // Performance card — tactical readout row
   perfCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
     paddingVertical: 14,
-    paddingHorizontal: 10,
-    marginHorizontal: -10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1E1E1E',
+    paddingHorizontal: 16,
+    borderLeftWidth: 2,
+    borderLeftColor: COLORS.glassBorder, // overridden inline per-row
   },
-  perfTime: { width: 60, alignItems: 'flex-end', gap: 4 },
-  perfTimeText: { color: '#555', fontSize: 12, fontWeight: '600' },
+  perfCardHeadliner: {
+    backgroundColor: COLORS.magenta + '0D',
+    borderLeftColor: COLORS.magenta,
+    borderLeftWidth: 3,
+  },
+  perfTime: { width: 52, alignItems: 'flex-end', gap: 4 },
+  perfTimeText: {
+    ...TYPOGRAPHY.monoSm,
+    color: COLORS.textSecondary,
+    textAlign: 'right',
+  },
   liveDot: { width: 6, height: 6, borderRadius: 3, alignSelf: 'flex-end' },
-  perfInfo: { flex: 1 },
+  perfInfo: { flex: 1, gap: 2 },
   perfArtist: { color: '#DDD', fontSize: 16, fontWeight: '700' },
-  perfDuration: { color: '#444', fontSize: 11, marginTop: 3 },
+  perfArtistHeadliner: { color: COLORS.magenta, fontSize: 17 },
+  perfDuration: {
+    ...TYPOGRAPHY.monoSm,
+    color: '#444',
+  },
+  headlinerLabel: {
+    ...TYPOGRAPHY.label,
+    color: COLORS.magenta,
+    marginTop: 3,
+  },
   liveBadge: {
     borderWidth: 1,
     borderRadius: 6,
@@ -409,11 +459,12 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 10,
     backgroundColor: '#FFD16612',
-    borderWidth: 1,
+    borderWidth: 0.5,
     borderColor: '#FFD16630',
     borderRadius: 10,
     padding: 12,
-    marginBottom: 8,
+    marginHorizontal: 16,
+    marginBottom: 4,
   },
   tipIcon: { fontSize: 20 },
   tipBody: { flex: 1, gap: 4 },

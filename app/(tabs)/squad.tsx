@@ -17,6 +17,7 @@ import { SquadSession } from '../../src/models/SquadSession';
 import { PackingItem } from '../../src/models/PackingItem';
 import { Stage } from '../../src/models/Stage';
 import QRDisplay from '../../src/components/QRDisplay';
+import { COLORS, GLASS_STYLE, TYPOGRAPHY, CYAN_GLOW } from '../../src/constants/Theme';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -154,7 +155,7 @@ function SquadFinance({ claimedByMe, claimedByOthers, unclaimed, allSquadItems }
   };
 
   return (
-    <View style={styles.financeCard}>
+    <View style={[styles.financeCard, GLASS_STYLE, CYAN_GLOW]}>
       <Text style={styles.sectionLabel}>SQUAD FINANCE</Text>
       <View style={styles.financeGrid}>
         <View style={styles.financeStat}>
@@ -228,7 +229,7 @@ function ActiveSquadView({ session, squadItems, stages, onLeave }: ActiveSquadPr
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.activeContainer}>
       {/* Header */}
-      <View style={styles.squadHeader}>
+      <View style={[styles.squadHeader, GLASS_STYLE, CYAN_GLOW]}>
         <View>
           <Text style={styles.squadName}>{session.displayName}</Text>
           <Text style={styles.squadRole}>{session.isLeader ? 'Squad Leader' : 'Squad Member'}</Text>
@@ -257,7 +258,7 @@ function ActiveSquadView({ session, squadItems, stages, onLeave }: ActiveSquadPr
       ) : null}
 
       {/* QR Code + Code */}
-      <View style={styles.qrSection}>
+      <View style={[styles.qrSection, GLASS_STYLE, CYAN_GLOW]}>
         <Text style={styles.sectionLabel}>RAVE QR — SHARE WITH CREW</Text>
         <View style={styles.qrRow}>
           <QRDisplay value={session.squadCode} size={160} />
@@ -349,7 +350,7 @@ const ItemRowBase = ({ item, currentUser, onClaim }: ItemRowProps) => {
   const isOthersClaimed = item.assignedTo && item.assignedTo !== currentUser;
 
   return (
-    <View style={styles.itemRow}>
+    <View style={[styles.itemRow, GLASS_STYLE, CYAN_GLOW]}>
       <View style={styles.itemInfo}>
         <Text style={styles.itemName}>{item.itemName}</Text>
         {item.assignedTo ? (
@@ -476,10 +477,10 @@ export default function SquadScreen() {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D0D0D' },
+  container: { flex: 1, backgroundColor: COLORS.background },
   noSquadContainer: {
     flex: 1,
-    backgroundColor: '#0D0D0D',
+    backgroundColor: COLORS.background,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 32,
@@ -487,26 +488,26 @@ const styles = StyleSheet.create({
   },
   activeContainer: { padding: 16, gap: 20 },
   emoji: { fontSize: 48 },
-  title: { color: '#FFF', fontSize: 28, fontWeight: '800', textAlign: 'center' },
-  subtitle: { color: '#666', fontSize: 14, textAlign: 'center', lineHeight: 22 },
+  title: { color: COLORS.cyan, fontSize: 28, fontWeight: '800', textAlign: 'center' },
+  subtitle: { color: COLORS.textSecondary, fontSize: 14, textAlign: 'center', lineHeight: 22 },
   buttonRow: { flexDirection: 'row', gap: 12, marginTop: 8 },
   form: { width: '100%', gap: 8, marginTop: 8 },
   formLabel: {
-    color: '#666',
+    color: COLORS.textSecondary,
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
   input: {
-    backgroundColor: '#1A1A1A',
-    color: '#FFF',
+    backgroundColor: COLORS.glassFill,
+    color: COLORS.textPrimary,
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#333',
+    borderWidth: 0.5,
+    borderColor: COLORS.glassBorder,
   },
   codeInput: {
     letterSpacing: 8,
@@ -515,37 +516,33 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   primaryBtn: {
-    backgroundColor: '#FF00FF',
+    backgroundColor: COLORS.magenta,
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 4,
   },
-  primaryBtnText: { color: '#000', fontWeight: '800', fontSize: 15 },
+  primaryBtnText: { color: COLORS.background, fontWeight: '800', fontSize: 15 },
   secondaryBtn: {
-    borderWidth: 1,
-    borderColor: '#FF00FF',
+    borderWidth: 0.5,
+    borderColor: COLORS.magenta,
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
     flex: 1,
   },
-  secondaryBtnText: { color: '#FF00FF', fontWeight: '700', fontSize: 15 },
+  secondaryBtnText: { color: COLORS.magenta, fontWeight: '700', fontSize: 15 },
   btnDisabled: { opacity: 0.4 },
-  cancelText: { color: '#555', fontSize: 13, textAlign: 'center', marginTop: 8 },
+  cancelText: { color: COLORS.textSecondary, fontSize: 13, textAlign: 'center', marginTop: 8 },
   // Active squad
   squadHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#1A1A1A',
-    borderRadius: 12,
     padding: 16,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
   },
-  squadName: { color: '#FFF', fontSize: 20, fontWeight: '800' },
-  squadRole: { color: '#666', fontSize: 12, marginTop: 2 },
+  squadName: { color: COLORS.cyan, fontSize: 20, fontWeight: '800' },
+  squadRole: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },
   badge: {
     borderWidth: 1,
     borderRadius: 20,
@@ -554,32 +551,28 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontSize: 11, fontWeight: '700' },
   qrSection: {
-    backgroundColor: '#1A1A1A',
-    borderRadius: 12,
     padding: 16,
-    borderWidth: 1,
-    borderColor: '#FF00FF22',
     gap: 12,
   },
   qrRow: { flexDirection: 'row', gap: 20, alignItems: 'center' },
   codeBlock: { flex: 1, gap: 4 },
   codeLabel: {
-    color: '#666',
+    color: COLORS.textSecondary,
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
   bigCode: {
-    color: '#FF00FF',
+    ...TYPOGRAPHY.monoLg,
+    color: COLORS.magenta,
     fontSize: 28,
-    fontWeight: '900',
     letterSpacing: 6,
   },
-  codeHint: { color: '#555', fontSize: 12 },
+  codeHint: { ...TYPOGRAPHY.monoSm, color: COLORS.textSecondary },
   section: { gap: 8 },
   sectionLabel: {
-    color: '#555',
+    color: COLORS.textSecondary,
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1.5,
@@ -588,61 +581,53 @@ const styles = StyleSheet.create({
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1A1A1A',
-    borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
     gap: 8,
   },
   itemInfo: { flex: 1 },
-  itemName: { color: '#FFF', fontSize: 15 },
-  claimedBy: { color: '#888', fontSize: 12, marginTop: 2 },
-  claimedByMe: { color: '#FF00FF' },
+  itemName: { color: COLORS.cyan, fontSize: 15 },
+  claimedBy: { color: COLORS.textSecondary, fontSize: 12, marginTop: 2 },
+  claimedByMe: { color: COLORS.magenta },
   claimBtn: {
-    borderWidth: 1,
-    borderColor: '#FF00FF',
+    borderWidth: 0.5,
+    borderColor: COLORS.magenta,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  claimBtnActive: { backgroundColor: '#FF00FF' },
-  claimBtnText: { color: '#FF00FF', fontSize: 13, fontWeight: '700' },
-  claimBtnTextActive: { color: '#000' },
+  claimBtnActive: { backgroundColor: COLORS.magenta },
+  claimBtnText: { color: COLORS.magenta, fontSize: 13, fontWeight: '700' },
+  claimBtnTextActive: { color: COLORS.background },
   leaveBtn: {
-    borderWidth: 1,
-    borderColor: '#333',
+    borderWidth: 0.5,
+    borderColor: COLORS.glassBorder,
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 8,
   },
-  leaveBtnText: { color: '#555', fontSize: 14 },
+  leaveBtnText: { color: COLORS.textSecondary, fontSize: 14 },
   // Rave Radar location banner
   radarRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#FF6B3512',
+    backgroundColor: COLORS.cyan + '0D',
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#FF6B3530',
+    borderWidth: 0.5,
+    borderColor: COLORS.glassBorder,
   },
   radarIcon: { fontSize: 14 },
   radarText: { flex: 1, fontSize: 13 },
-  radarStage: { color: '#FF6B35', fontWeight: '700' },
-  radarAt: { color: '#555' },
-  radarTime: { color: '#555', fontSize: 12 },
+  radarStage: { color: COLORS.cyan, fontWeight: '700' },
+  radarAt: { color: COLORS.textSecondary },
+  radarTime: { ...TYPOGRAPHY.monoSm, color: COLORS.textSecondary },
   // Squad Finance
   financeCard: {
-    backgroundColor: '#1A1A1A',
-    borderRadius: 12,
     padding: 16,
-    borderWidth: 1,
-    borderColor: '#FFD16622',
     gap: 12,
   },
   financeGrid: {
@@ -656,12 +641,13 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   financeValue: {
-    color: '#FF6B35',
+    ...TYPOGRAPHY.monoMd,
+    color: COLORS.cyan,
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: '800' as const,
   },
   financeLabel: {
-    color: '#555',
+    color: COLORS.textSecondary,
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1,
@@ -670,7 +656,7 @@ const styles = StyleSheet.create({
   upsellRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0D0D0D',
+    backgroundColor: COLORS.background,
     borderRadius: 8,
     padding: 10,
     borderWidth: 1,
@@ -678,7 +664,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   upsellText: { flex: 1 },
-  upsellName: { color: '#FFF', fontSize: 13, fontWeight: '700' },
+  upsellName: { color: COLORS.cyan, fontSize: 13, fontWeight: '700' },
   upsellPrice: { color: '#666', fontSize: 11, marginTop: 2 },
   upsellCta: { color: '#FFD166', fontSize: 13, fontWeight: '700' },
 });

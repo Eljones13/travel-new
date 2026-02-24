@@ -1,62 +1,145 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { FestivalPin, TacticalMarker } from './FestivalMap';
+import { FestivalPin, SquadPin, TacticalMarker } from './FestivalMap';
 import { checkOfflineReady, downloadMapTiles, CACHE_NAME } from '../lib/tileCache.web';
+import { COLORS } from '../constants/Theme';
+
+// ── Web-compatible mono typography (mirrors TYPOGRAPHY.monoSm) ────────────────
+
+const MONO: React.CSSProperties = {
+  fontFamily: 'monospace',
+  fontSize: 11,
+  letterSpacing: '0.8px',
+};
 
 // ── Leaflet CSS ───────────────────────────────────────────────────────────────
 
 function useLeafletCSS() {
   useEffect(() => {
     const id = 'leaflet-css';
-    if (document.getElementById(id)) return;
-    const link = document.createElement('link');
-    link.id = id;
-    link.rel = 'stylesheet';
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-    document.head.appendChild(link);
+    if (!document.getElementById(id)) {
+      const link = document.createElement('link');
+      link.id = id;
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+    // Satellite HUD filter — desaturates tile layer only, markers stay vivid
+    const hudId = 'leaflet-hud-style';
+    if (!document.getElementById(hudId)) {
+      const style = document.createElement('style');
+      style.id = hudId;
+      style.textContent = `
+        .leaflet-tile-pane { filter: brightness(0.72) contrast(1.2) saturate(0.45); }
+        .leaflet-control-zoom a {
+          background: rgba(13,13,13,0.92) !important;
+          color: #00F2FF !important;
+          border-color: rgba(0,242,255,0.3) !important;
+          font-family: monospace !important;
+        }
+        .leaflet-control-attribution {
+          background: rgba(13,13,13,0.7) !important;
+          color: rgba(255,255,255,0.25) !important;
+          font-size: 9px !important;
+        }
+        .leaflet-popup-content-wrapper {
+          background: #1A1A1A !important;
+          border: 0.5px solid rgba(0,242,255,0.3) !important;
+          border-radius: 8px !important;
+          box-shadow: 0 0 12px rgba(0,242,255,0.3) !important;
+        }
+        .leaflet-popup-tip { background: #1A1A1A !important; }
+      `;
+      document.head.appendChild(style);
+    }
   }, []);
 }
 
-// ── Neon markers (festival pins) ──────────────────────────────────────────────
+// ── Festival pin markers ───────────────────────────────────────────────────────
 
 const PIN_COLOURS: Record<string, string> = {
-  wet: '#FF00FF',
-  beach: '#00FFFF',
-  none: '#FF6B35',
+  wet:   COLORS.magenta,
+  beach: COLORS.cyan,
+  none:  COLORS.orange,
 };
 
 function makeNeonIcon(L: typeof import('leaflet'), colour: string) {
   return L.divIcon({
     className: '',
-    html: `<div style="width:18px;height:18px;border-radius:50%;background:${colour};box-shadow:0 0 8px 4px ${colour}99,0 0 20px 8px ${colour}44;border:2px solid #fff;"></div>`,
-    iconSize: [18, 18],
-    iconAnchor: [9, 9],
+    html: `<div style="
+      width:20px;height:20px;border-radius:50%;
+      background:${colour}22;
+      border:2px solid ${colour};
+      box-shadow:0 0 10px 5px ${colour}AA,0 0 24px 10px ${colour}55,inset 0 0 6px ${colour}33;
+    "></div>`,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
     popupAnchor: [0, -14],
   });
 }
 
 // ── Tactical safety marker icons ──────────────────────────────────────────────
+// plus  = Medical   → Safety Orange glow
+// droplet = Water   → Cyber Cyan glow
+// exit  = Emergency → Safety Orange glow
 
 const TACTICAL_SYMBOLS: Record<string, string> = {
-  plus: '✚',
+  plus:    '✚',
   droplet: '◉',
-  exit: '▶',
+  exit:    '▶',
 };
 
 const TACTICAL_COLOURS: Record<string, string> = {
-  plus: '#FF6B35',
-  droplet: '#00C8FF',
-  exit: '#FF6B35',
+  plus:    COLORS.orange,
+  droplet: COLORS.cyan,
+  exit:    COLORS.orange,
 };
 
 function makeTacticalIcon(L: typeof import('leaflet'), icon: string) {
-  const sym = TACTICAL_SYMBOLS[icon] ?? '●';
-  const colour = TACTICAL_COLOURS[icon] ?? '#FF6B35';
+  const sym    = TACTICAL_SYMBOLS[icon] ?? '●';
+  const colour = TACTICAL_COLOURS[icon] ?? COLORS.orange;
   return L.divIcon({
     className: '',
-    html: `<div style="width:22px;height:22px;border-radius:4px;background:#0D0D0D;border:1.5px solid ${colour};display:flex;align-items:center;justify-content:center;font-size:11px;color:${colour};line-height:1;box-shadow:0 0 6px 2px ${colour}55;">${sym}</div>`,
-    iconSize: [22, 22],
-    iconAnchor: [11, 11],
-    popupAnchor: [0, -16],
+    html: `<div style="
+      width:26px;height:26px;border-radius:50%;
+      background:${colour}1A;
+      border:2px solid ${colour};
+      display:flex;align-items:center;justify-content:center;
+      font-size:12px;color:${colour};line-height:1;
+      box-shadow:0 0 10px 5px ${colour}AA,0 0 26px 12px ${colour}55,inset 0 0 8px ${colour}22;
+    ">${sym}</div>`,
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+    popupAnchor: [0, -18],
+  });
+}
+
+// ── Squad pin marker — Neon Magenta glow ──────────────────────────────────────
+
+function makeSquadIcon(L: typeof import('leaflet'), name: string) {
+  const colour = COLORS.magenta;
+  // Truncate long names so the label stays compact on the map
+  const label = name.length > 10 ? name.slice(0, 9) + '…' : name;
+  return L.divIcon({
+    className: '',
+    html: `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+      <div style="
+        width:22px;height:22px;border-radius:50%;
+        background:${colour}22;
+        border:2px solid ${colour};
+        display:flex;align-items:center;justify-content:center;
+        font-size:12px;color:${colour};
+        box-shadow:0 0 10px 4px ${colour}99,0 0 22px 10px ${colour}44;
+      ">●</div>
+      <span style="
+        font-family:monospace;font-size:9px;letter-spacing:0.8px;
+        color:${colour};background:${COLORS.background}cc;
+        padding:1px 4px;border-radius:3px;border:0.5px solid ${colour}66;
+        white-space:nowrap;
+      ">${label}</span>
+    </div>`,
+    iconSize: [60, 40],
+    iconAnchor: [30, 11],
+    popupAnchor: [0, -20],
   });
 }
 
@@ -125,7 +208,7 @@ function createOfflineTileLayer(
 
 // ── Zoom-aware SVG site map overlay (factory) ────────────────────────────────
 // Appears at zoom ≥ 13 over the S2O Rajamangala Stadium footprint.
-// Swap SITE_MAP_URL for the official venue map PNG/SVG in production.
+// Swap S2O_SITE_MAP_URL for the official venue map PNG/SVG in production.
 
 const S2O_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400">
   <rect width="600" height="400" rx="4" fill="#0a0a0a" opacity="0.95"/>
@@ -134,27 +217,33 @@ const S2O_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400">
     stroke="#2a2a2a" stroke-width="14" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
   <line x1="140" y1="175" x2="60" y2="95" stroke="#222" stroke-width="10" stroke-linecap="round"/>
   <line x1="460" y1="175" x2="540" y2="95" stroke="#222" stroke-width="10" stroke-linecap="round"/>
-  <rect x="230" y="28" width="140" height="90" rx="6" fill="#FF00FF14" stroke="#FF00FF" stroke-width="2.5"/>
-  <text x="300" y="72" text-anchor="middle" fill="#FF00FF" font-size="11" font-family="monospace" font-weight="bold">MAIN STAGE</text>
-  <text x="300" y="88" text-anchor="middle" fill="#FF00FF66" font-size="8" font-family="monospace">THE SPLASH ZONE</text>
-  <rect x="40" y="100" width="120" height="75" rx="6" fill="#00C8FF14" stroke="#00C8FF" stroke-width="2.5"/>
-  <text x="100" y="141" text-anchor="middle" fill="#00C8FF" font-size="10" font-family="monospace" font-weight="bold">WATER DOME</text>
-  <text x="100" y="156" text-anchor="middle" fill="#00C8FF55" font-size="7.5" font-family="monospace">HOUSE &amp; TECHNO</text>
-  <rect x="440" y="100" width="120" height="75" rx="6" fill="#FFD16614" stroke="#FFD166" stroke-width="2.5"/>
-  <text x="500" y="141" text-anchor="middle" fill="#FFD166" font-size="10" font-family="monospace" font-weight="bold">THE OASIS</text>
-  <text x="500" y="156" text-anchor="middle" fill="#FFD16655" font-size="7.5" font-family="monospace">CHILL · FOOD</text>
-  <circle cx="210" cy="248" r="13" fill="#FF6B3518" stroke="#FF6B35" stroke-width="1.5"/>
-  <text x="210" y="253" text-anchor="middle" fill="#FF6B35" font-size="12" font-family="monospace">✚</text>
-  <circle cx="390" cy="248" r="13" fill="#00C8FF18" stroke="#00C8FF" stroke-width="1.5"/>
-  <text x="390" y="253" text-anchor="middle" fill="#00C8FF" font-size="12" font-family="monospace">◉</text>
+  <!-- Main Stage -->
+  <rect x="230" y="28" width="140" height="90" rx="6" fill="${COLORS.magenta}14" stroke="${COLORS.magenta}" stroke-width="2.5"/>
+  <text x="300" y="72" text-anchor="middle" fill="${COLORS.magenta}" font-size="11" font-family="monospace" font-weight="bold">MAIN STAGE</text>
+  <text x="300" y="88" text-anchor="middle" fill="${COLORS.magenta}66" font-size="8" font-family="monospace">THE SPLASH ZONE</text>
+  <!-- Water Dome -->
+  <rect x="40" y="100" width="120" height="75" rx="6" fill="${COLORS.cyan}14" stroke="${COLORS.cyan}" stroke-width="2.5"/>
+  <text x="100" y="141" text-anchor="middle" fill="${COLORS.cyan}" font-size="10" font-family="monospace" font-weight="bold">WATER DOME</text>
+  <text x="100" y="156" text-anchor="middle" fill="${COLORS.cyan}55" font-size="7.5" font-family="monospace">HOUSE &amp; TECHNO</text>
+  <!-- The Oasis -->
+  <rect x="440" y="100" width="120" height="75" rx="6" fill="${COLORS.gold}14" stroke="${COLORS.gold}" stroke-width="2.5"/>
+  <text x="500" y="141" text-anchor="middle" fill="${COLORS.gold}" font-size="10" font-family="monospace" font-weight="bold">THE OASIS</text>
+  <text x="500" y="156" text-anchor="middle" fill="${COLORS.gold}55" font-size="7.5" font-family="monospace">CHILL · FOOD</text>
+  <!-- Medical POI -->
+  <circle cx="210" cy="248" r="13" fill="${COLORS.orange}18" stroke="${COLORS.orange}" stroke-width="1.5"/>
+  <text x="210" y="253" text-anchor="middle" fill="${COLORS.orange}" font-size="12" font-family="monospace">✚</text>
+  <!-- Water POI -->
+  <circle cx="390" cy="248" r="13" fill="${COLORS.cyan}18" stroke="${COLORS.cyan}" stroke-width="1.5"/>
+  <text x="390" y="253" text-anchor="middle" fill="${COLORS.cyan}" font-size="12" font-family="monospace">◉</text>
+  <!-- Entry / Exit -->
   <rect x="263" y="307" width="74" height="22" rx="3" fill="#FFFFFF08" stroke="#444" stroke-width="1.5"/>
   <text x="300" y="322" text-anchor="middle" fill="#666" font-size="8" font-family="monospace">ENTRY ▼</text>
-  <rect x="263" y="355" width="74" height="22" rx="3" fill="#FF6B3518" stroke="#FF6B35" stroke-width="1.5"/>
-  <text x="300" y="370" text-anchor="middle" fill="#FF6B35" font-size="8" font-family="monospace">EXIT ▶</text>
-  <rect x="24" y="355" width="74" height="22" rx="3" fill="#FF6B3518" stroke="#FF6B35" stroke-width="1.5"/>
-  <text x="61" y="370" text-anchor="middle" fill="#FF6B35" font-size="8" font-family="monospace">EXIT ▶</text>
-  <rect x="502" y="355" width="74" height="22" rx="3" fill="#FF6B3518" stroke="#FF6B35" stroke-width="1.5"/>
-  <text x="539" y="370" text-anchor="middle" fill="#FF6B35" font-size="8" font-family="monospace">EXIT ▶</text>
+  <rect x="263" y="355" width="74" height="22" rx="3" fill="${COLORS.orange}18" stroke="${COLORS.orange}" stroke-width="1.5"/>
+  <text x="300" y="370" text-anchor="middle" fill="${COLORS.orange}" font-size="8" font-family="monospace">EXIT ▶</text>
+  <rect x="24" y="355" width="74" height="22" rx="3" fill="${COLORS.orange}18" stroke="${COLORS.orange}" stroke-width="1.5"/>
+  <text x="61" y="370" text-anchor="middle" fill="${COLORS.orange}" font-size="8" font-family="monospace">EXIT ▶</text>
+  <rect x="502" y="355" width="74" height="22" rx="3" fill="${COLORS.orange}18" stroke="${COLORS.orange}" stroke-width="1.5"/>
+  <text x="539" y="370" text-anchor="middle" fill="${COLORS.orange}" font-size="8" font-family="monospace">EXIT ▶</text>
   <text x="300" y="394" text-anchor="middle" fill="#2a2a2a" font-size="7" font-family="monospace">S2O SONGKRAN 2026 · RAJAMANGALA STADIUM · PLACEHOLDER — REPLACE WITH OFFICIAL MAP</text>
 </svg>`;
 
@@ -208,19 +297,15 @@ function createZoomAwareTacticalMarkers(
     return (
       <>
         {markers.map((m) => {
-          const colour = TACTICAL_COLOURS[m.icon] ?? '#FF6B35';
+          const colour = TACTICAL_COLOURS[m.icon] ?? COLORS.orange;
           return (
             <Marker key={m.id} position={[m.lat, m.lng]} icon={makeTacticalIcon(L, m.icon)}>
               <Popup>
-                <div style={{
-                  background: '#1A1A1A',
-                  padding: '4px 10px',
-                  borderRadius: 6,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: colour,
-                } as React.CSSProperties}>
-                  {m.label}
+                <div style={popupStyle(colour)}>
+                  <strong style={{ display: 'block', marginBottom: 3 }}>{m.label}</strong>
+                  <span style={{ ...MONO, color: colour, textTransform: 'uppercase' }}>
+                    {m.icon === 'plus' ? 'MEDICAL' : m.icon === 'droplet' ? 'WATER' : 'EXIT'}
+                  </span>
                 </div>
               </Popup>
             </Marker>
@@ -228,6 +313,23 @@ function createZoomAwareTacticalMarkers(
         })}
       </>
     );
+  };
+}
+
+// ── Coordinate tracker (factory) ──────────────────────────────────────────────
+// Renders nothing in the map — fires onMove whenever the viewport changes.
+
+function createCoordTracker(
+  useMap: typeof import('react-leaflet')['useMap'],
+  useMapEvents: typeof import('react-leaflet')['useMapEvents']
+) {
+  return function CoordTracker({ onMove }: { onMove: (lat: number, lng: number) => void }) {
+    const map = useMap();
+    useMapEvents({
+      moveend: () => { const c = map.getCenter(); onMove(c.lat, c.lng); },
+      zoomend: () => { const c = map.getCenter(); onMove(c.lat, c.lng); },
+    });
+    return null;
   };
 }
 
@@ -240,6 +342,7 @@ type LazyLeaflet = {
   OfflineTileLayer: ReturnType<typeof createOfflineTileLayer>;
   ZoomAwareTacticalMarkers: ReturnType<typeof createZoomAwareTacticalMarkers>;
   ZoomAwareSiteMap: ReturnType<typeof createZoomAwareSiteMap>;
+  CoordTracker: ReturnType<typeof createCoordTracker>;
   L: typeof import('leaflet');
 };
 
@@ -248,9 +351,11 @@ type LazyLeaflet = {
 export default function FestivalMap({
   festivals,
   markers = [],
+  squadPins = [],
 }: {
   festivals: FestivalPin[];
   markers?: TacticalMarker[];
+  squadPins?: SquadPin[];
 }) {
   useLeafletCSS();
 
@@ -258,6 +363,9 @@ export default function FestivalMap({
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [Leaflet, setLeaflet] = useState<LazyLeaflet | null>(null);
+  const [mapCenter, setMapCenter] = useState<[number, number]>(() =>
+    festivals.length > 0 ? [festivals[0].lat, festivals[0].lng] : [20, 20]
+  );
 
   useEffect(() => {
     checkOfflineReady().then((ready) =>
@@ -277,6 +385,7 @@ export default function FestivalMap({
           l.default
         ),
         ZoomAwareSiteMap: createZoomAwareSiteMap(rl.useMap, rl.useMapEvents, rl.ImageOverlay),
+        CoordTracker: createCoordTracker(rl.useMap, rl.useMapEvents),
         L: l.default,
       });
     });
@@ -292,13 +401,19 @@ export default function FestivalMap({
 
   if (!Leaflet) {
     return (
-      <div style={{ flex: 1, background: '#1A1A1A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ color: '#555', fontSize: 14 }}>Loading map…</span>
+      <div style={{
+        flex: 1,
+        background: COLORS.background,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <span style={{ ...MONO, color: COLORS.textSecondary }}>LOADING MAP…</span>
       </div>
     );
   }
 
-  const { MapContainer, Marker, Popup, OfflineTileLayer, ZoomAwareTacticalMarkers, ZoomAwareSiteMap, L } = Leaflet;
+  const { MapContainer, Marker, Popup, OfflineTileLayer, ZoomAwareTacticalMarkers, ZoomAwareSiteMap, CoordTracker, L } = Leaflet;
   const center: [number, number] = festivals.length > 0
     ? [festivals[0].lat, festivals[0].lng]
     : [20, 20];
@@ -310,17 +425,19 @@ export default function FestivalMap({
         zoom={3}
         minZoom={2}
         maxZoom={18}
-        style={{ width: '100%', height: '100%', minHeight: 300, background: '#0D0D0D' }}
+        style={{ width: '100%', height: '100%', minHeight: 300, background: COLORS.background }}
       >
         <OfflineTileLayer />
+
+        {/* Festival pins */}
         {festivals.map((f) => {
-          const colour = PIN_COLOURS[f.trigger] ?? '#FF6B35';
+          const colour = PIN_COLOURS[f.trigger] ?? COLORS.orange;
           return (
             <Marker key={f.id} position={[f.lat, f.lng]} icon={makeNeonIcon(L, colour)}>
               <Popup>
-                <div style={{ background: '#1A1A1A', color: '#fff', padding: '6px 10px', borderRadius: 8, minWidth: 140 }}>
-                  <strong style={{ display: 'block', marginBottom: 4 }}>{f.name}</strong>
-                  <span style={{ color: colour, textTransform: 'uppercase', fontSize: 11, letterSpacing: 1 }}>
+                <div style={popupStyle(colour)}>
+                  <strong style={{ display: 'block', marginBottom: 3 }}>{f.name}</strong>
+                  <span style={{ ...MONO, color: colour, textTransform: 'uppercase' }}>
                     {f.trigger}
                   </span>
                 </div>
@@ -328,20 +445,49 @@ export default function FestivalMap({
             </Marker>
           );
         })}
+
+        {/* Squad pins — Neon Magenta */}
+        {squadPins.map((sq) => (
+          <Marker key={sq.id} position={[sq.lat, sq.lng]} icon={makeSquadIcon(L, sq.name)}>
+            <Popup>
+              <div style={popupStyle(COLORS.magenta)}>
+                <strong style={{ display: 'block', marginBottom: 3 }}>{sq.name}</strong>
+                <span style={{ ...MONO, color: COLORS.magenta }}>SQUAD MEMBER</span>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+
         <ZoomAwareSiteMap />
         <ZoomAwareTacticalMarkers markers={markers} />
+        <CoordTracker onMove={(lat, lng) => setMapCenter([lat, lng])} />
       </MapContainer>
+
+      {/* ── HUD Frame — corner brackets + crosshair ─────────────────────── */}
+      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 900 }}>
+        {/* Corners */}
+        <div style={{ position: 'absolute', top: 10, left: 10, width: 22, height: 22, borderTop: `1.5px solid ${COLORS.cyan}`, borderLeft: `1.5px solid ${COLORS.cyan}`, opacity: 0.65 }} />
+        <div style={{ position: 'absolute', top: 10, right: 10, width: 22, height: 22, borderTop: `1.5px solid ${COLORS.cyan}`, borderRight: `1.5px solid ${COLORS.cyan}`, opacity: 0.65 }} />
+        <div style={{ position: 'absolute', bottom: 10, left: 10, width: 22, height: 22, borderBottom: `1.5px solid ${COLORS.cyan}`, borderLeft: `1.5px solid ${COLORS.cyan}`, opacity: 0.65 }} />
+        <div style={{ position: 'absolute', bottom: 10, right: 10, width: 22, height: 22, borderBottom: `1.5px solid ${COLORS.cyan}`, borderRight: `1.5px solid ${COLORS.cyan}`, opacity: 0.65 }} />
+        {/* Crosshair */}
+        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 32, height: 32 }}>
+          <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, background: `${COLORS.cyan}55`, marginTop: -0.5 }} />
+          <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, background: `${COLORS.cyan}55`, marginLeft: -0.5 }} />
+          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 8, height: 8, borderRadius: '50%', border: `1px solid ${COLORS.cyan}88` }} />
+        </div>
+      </div>
 
       {/* Blackout Mode badge — floats over the map */}
       <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 1000 }}>
         {offlineStatus === 'ready' ? (
-          <div style={badge('#00FF88', '#00FF8830')}>✓ Offline Ready</div>
+          <div style={badge('#00FF88')}>✓ OFFLINE READY</div>
         ) : downloading ? (
-          <div style={{ ...badge('#FFD166', '#FFD16630'), minWidth: 148 }}>
-            <div style={{ marginBottom: 5 }}>Saving… {progress}%</div>
+          <div style={{ ...badge(COLORS.gold), minWidth: 148 }}>
+            <div style={{ marginBottom: 5 }}>SAVING… {progress}%</div>
             <div style={{ background: '#333', borderRadius: 3, height: 4 }}>
               <div style={{
-                background: '#FFD166',
+                background: COLORS.gold,
                 borderRadius: 3,
                 height: 4,
                 width: `${progress}%`,
@@ -351,31 +497,39 @@ export default function FestivalMap({
           </div>
         ) : offlineStatus === 'not-ready' ? (
           <button onClick={handleDownload} style={downloadBtnStyle}>
-            ⬇ Save for Offline
+            ⬇ SAVE FOR OFFLINE
           </button>
         ) : null}
       </div>
 
-      {/* Tactical marker legend — only visible at zoom > 5 */}
+      {/* Tactical marker legend */}
       <div style={{
         position: 'absolute',
         bottom: 10,
         left: 10,
         zIndex: 1000,
-        background: 'rgba(13,13,13,0.85)',
+        background: 'rgba(13,13,13,0.92)',
         borderRadius: 8,
-        padding: '6px 10px',
+        padding: '8px 12px',
         display: 'flex',
         flexDirection: 'column',
-        gap: 3,
-        backdropFilter: 'blur(4px)',
-        border: '1px solid #2A2A2A',
-        fontSize: 11,
+        gap: 5,
+        backdropFilter: 'blur(8px)',
+        border: `0.5px solid ${COLORS.glassBorder}`,
+        ...MONO,
       }}>
-        <span style={{ color: '#FF6B35' }}>✚ Medical</span>
-        <span style={{ color: '#00C8FF' }}>◉ Water</span>
-        <span style={{ color: '#FF6B35' }}>▶ Exit</span>
-        <span style={{ color: '#444', fontSize: 10, marginTop: 2 }}>Zoom in to see POIs</span>
+        <span style={{ color: COLORS.orange }}>● MEDICAL</span>
+        <span style={{ color: COLORS.cyan }}>● WATER</span>
+        <span style={{ color: COLORS.orange }}>● EXIT</span>
+        <span style={{ color: COLORS.magenta }}>● SQUAD PIN</span>
+        <div style={{ width: '100%', height: '0.5px', background: COLORS.glassBorder, margin: '4px 0' }} />
+        <span style={{ color: COLORS.textSecondary, fontSize: 9, opacity: 0.5 }}>ZOOM IN FOR POIs</span>
+        <span style={{ color: COLORS.cyan, fontSize: 9, opacity: 0.8, letterSpacing: '0.5px' }}>
+          {mapCenter[0].toFixed(4)}°N
+        </span>
+        <span style={{ color: COLORS.cyan, fontSize: 9, opacity: 0.8, letterSpacing: '0.5px' }}>
+          {mapCenter[1].toFixed(4)}°E
+        </span>
       </div>
     </div>
   );
@@ -383,25 +537,34 @@ export default function FestivalMap({
 
 // ── Style helpers ─────────────────────────────────────────────────────────────
 
-const badge = (colour: string, border: string): React.CSSProperties => ({
-  background: 'rgba(13,13,13,0.9)',
+const popupStyle = (colour: string): React.CSSProperties => ({
+  background: COLORS.surface,
+  color: COLORS.textPrimary,
+  padding: '6px 10px',
+  borderRadius: 8,
+  minWidth: 130,
+  border: `0.5px solid ${colour}55`,
+});
+
+const badge = (colour: string): React.CSSProperties => ({
+  background: 'rgba(13,13,13,0.92)',
   color: colour,
   padding: '5px 12px',
   borderRadius: 20,
-  fontSize: 12,
   fontWeight: 700,
-  border: `1px solid ${border}`,
-  backdropFilter: 'blur(4px)',
+  border: `0.5px solid ${colour}66`,
+  backdropFilter: 'blur(8px)',
+  ...MONO,
 });
 
 const downloadBtnStyle: React.CSSProperties = {
-  background: '#FF00FF',
-  color: '#000',
+  background: COLORS.magenta,
+  color: COLORS.background,
   padding: '5px 14px',
   borderRadius: 20,
   border: 'none',
   cursor: 'pointer',
   fontWeight: 700,
-  fontSize: 12,
-  letterSpacing: 0.5,
+  letterSpacing: '0.8px',
+  ...MONO,
 };

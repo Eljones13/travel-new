@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   TextInput,
@@ -15,6 +15,103 @@ import { withObservables, useDatabase } from '@nozbe/watermelondb/react';
 import { Q } from '@nozbe/watermelondb';
 import { database } from '../../src/db';
 import { PackingItem, WeatherTrigger } from '../../src/models/PackingItem';
+import { Performance } from '../../src/models/Performance';
+import { Stage } from '../../src/models/Stage';
+import { COLORS, GLASS_STYLE, TYPOGRAPHY, TACTICAL_GLOW, CYAN_GLOW, getZoneColor } from '../../src/constants/Theme';
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+// Bangkok UTC+7 — matches offset used throughout schedule.tsx
+function fmt24(ms: number): string {
+  const d = new Date(ms + 7 * 3600 * 1000);
+  const h = d.getUTCHours().toString().padStart(2, '0');
+  const m = d.getUTCMinutes().toString().padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+// ── Next Set Card ─────────────────────────────────────────────────────────────
+// Self-contained: subscribes to its own DB observables so PackingListBase
+// stays unaffected. Ticks every 60s so the countdown stays current.
+
+type NextSetBaseProps = { performances: Performance[]; stages: Stage[] };
+
+function NextSetCardBase({ performances, stages }: NextSetBaseProps) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // First performance that hasn't ended yet (array already sorted start_time asc)
+  const nextPerf = performances.find((p) => p.endTime > now) ?? null;
+  if (!nextPerf) return null;
+
+  const stage      = stages.find((s) => s.id === nextPerf.stageId) ?? null;
+  const zoneColor  = getZoneColor(stage?.stageName ?? '');
+  const isLive     = now >= nextPerf.startTime;
+  const minsUntil  = Math.max(0, Math.floor((nextPerf.startTime - now) / 60_000));
+  const countdown  = isLive ? 'LIVE NOW' : minsUntil < 60
+    ? `IN ${minsUntil} MIN`
+    : `IN ${Math.floor(minsUntil / 60)}H ${minsUntil % 60}M`;
+
+  return (
+    <View
+      style={[
+        styles.nextSetCard,
+        GLASS_STYLE,
+        {
+          borderColor: zoneColor,
+          borderWidth: 1.5,
+          shadowColor: zoneColor,
+          ...TACTICAL_GLOW,
+        },
+      ]}
+    >
+      {/* Header row */}
+      <View style={styles.nextSetHeader}>
+        <Text style={styles.nextSetLabel}>NEXT SET</Text>
+        <View style={[styles.countdownBadge, { borderColor: zoneColor + '88' }]}>
+          <Text style={[styles.countdownText, { color: isLive ? zoneColor : COLORS.textSecondary }]}>
+            {countdown}
+          </Text>
+        </View>
+      </View>
+
+      {/* Artist */}
+      <Text style={styles.nextSetArtist} numberOfLines={1}>{nextPerf.artist}</Text>
+
+      {/* Stage + time row */}
+      <View style={styles.nextSetMeta}>
+        <Text style={[styles.nextSetStage, { color: zoneColor }]} numberOfLines={1}>
+          {stage?.stageName ?? '—'}
+        </Text>
+        <Text style={styles.nextSetTime}>
+          {fmt24(nextPerf.startTime)}–{fmt24(nextPerf.endTime)}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+const NextSetCard = withObservables([], () => ({
+  performances: database
+    .get<Performance>('performances')
+    .query(Q.sortBy('start_time', Q.asc))
+    .observe(),
+  stages: database.get<Stage>('stages').query().observe(),
+}))(NextSetCardBase);
+
+// ── Offline Status Bar ─────────────────────────────────────────────────────────
+
+function OfflineBanner() {
+  return (
+    <View style={styles.offlineBanner}>
+      <Text style={styles.offlineDot}>●</Text>
+      <Text style={styles.offlineText}>OFFLINE MODE: ACTIVE</Text>
+    </View>
+  );
+}
 
 // ── Row Component ──────────────────────────────────────────────────────────────
 // Each row independently observes its own record so only the toggled row re-renders.
@@ -42,7 +139,7 @@ const PackingItemRowBase = ({ item }: RowBaseProps) => {
   }, [item.affiliateUrl]);
 
   return (
-    <TouchableOpacity style={styles.row} onPress={togglePacked} activeOpacity={0.7}>
+    <TouchableOpacity style={[styles.row, GLASS_STYLE, CYAN_GLOW]} onPress={togglePacked} activeOpacity={0.7}>
       <View style={[styles.checkbox, item.isPacked && styles.checkboxChecked]}>
         {item.isPacked && <Text style={styles.checkmark}>✓</Text>}
       </View>
@@ -115,8 +212,11 @@ const PackingListBase = ({ packingItems }: ListBaseProps) => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      <OfflineBanner />
+      <NextSetCard />
+
       {/* Add Item Form */}
-      <View style={styles.form}>
+      <View style={[styles.form, GLASS_STYLE, CYAN_GLOW]}>
         <TextInput
           style={styles.input}
           placeholder="Add item (e.g. Tent, Rain poncho...)"
@@ -150,6 +250,8 @@ const PackingListBase = ({ packingItems }: ListBaseProps) => {
         data={packingItems}
         renderItem={({ item }) => <PackingItemRow item={item} />}
         keyExtractor={(item) => item.id}
+        estimatedItemSize={60}
+        contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <Text style={styles.emptyText}>
             Your pack is empty.{'\n'}Add your first item above.
@@ -178,29 +280,100 @@ export default function PackingListScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0D0D0D',
+    backgroundColor: COLORS.background,
   },
+  // ── Offline Banner ───────────────────────────────────────────────────────────
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 7,
+    backgroundColor: 'rgba(0, 242, 255, 0.06)',
+    borderBottomWidth: 0.5,
+    borderBottomColor: COLORS.glassBorder,
+    shadowColor: COLORS.cyan,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  offlineDot: {
+    color: COLORS.cyan,
+    fontSize: 8,
+  },
+  offlineText: {
+    color: COLORS.cyan,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 2,
+  },
+  // ── Next Set Card ─────────────────────────────────────────────────────────────
+  nextSetCard: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 14,
+    gap: 6,
+  },
+  nextSetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  nextSetLabel: {
+    ...TYPOGRAPHY.label,
+    color: COLORS.textSecondary,
+  },
+  countdownBadge: {
+    borderWidth: 0.5,
+    borderRadius: 20,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+  },
+  countdownText: {
+    ...TYPOGRAPHY.monoSm,
+  },
+  nextSetArtist: {
+    color: COLORS.textPrimary,
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  nextSetMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  nextSetStage: {
+    ...TYPOGRAPHY.monoSm,
+    flex: 1,
+  },
+  nextSetTime: {
+    ...TYPOGRAPHY.monoSm,
+    color: COLORS.textSecondary,
+  },
+  // ── Form ─────────────────────────────────────────────────────────────────────
   form: {
+    margin: 16,
     padding: 16,
     gap: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1E1E1E',
   },
   input: {
-    backgroundColor: '#1A1A1A',
-    color: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    color: COLORS.textPrimary,
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#333',
+    borderWidth: 0.5,
+    borderColor: COLORS.glassBorder,
   },
   inputSecondary: {
     fontSize: 14,
   },
   addButton: {
-    backgroundColor: '#FF6B35',
+    backgroundColor: COLORS.orange,
     borderRadius: 8,
     paddingVertical: 14,
     alignItems: 'center',
@@ -212,9 +385,14 @@ const styles = StyleSheet.create({
     fontSize: 15,
     letterSpacing: 1,
   },
+  // ── List ─────────────────────────────────────────────────────────────────────
+  listContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 32,
+  },
   countText: {
-    color: '#666',
-    fontSize: 13,
+    ...TYPOGRAPHY.monoSm,
+    color: COLORS.textSecondary,
     textAlign: 'center',
     paddingVertical: 8,
   },
@@ -223,25 +401,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#1E1E1E',
+    marginVertical: 4,
     minHeight: 60,
   },
   checkbox: {
     width: 24,
     height: 24,
     borderRadius: 6,
-    borderWidth: 2,
-    borderColor: '#FF6B35',
+    borderWidth: 1.5,
+    borderColor: COLORS.cyan,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
   checkboxChecked: {
-    backgroundColor: '#FF6B35',
+    backgroundColor: COLORS.cyan,
   },
   checkmark: {
-    color: '#FFF',
+    color: COLORS.background,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -249,7 +426,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemName: {
-    color: '#FFF',
+    color: COLORS.textPrimary,
     fontSize: 16,
   },
   itemNamePacked: {
@@ -262,14 +439,14 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   weatherBadge: {
-    color: '#FF6B35',
+    color: COLORS.orange,
     fontSize: 11,
     marginTop: 2,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   assignedTo: {
-    color: '#FF00FF',
+    color: COLORS.magenta,
     fontSize: 11,
     marginTop: 2,
     fontWeight: '600',

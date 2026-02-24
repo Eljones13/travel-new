@@ -15,6 +15,7 @@ import { Festival } from '../../src/models/Festival';
 import { PackingItem, WeatherTrigger } from '../../src/models/PackingItem';
 import FestivalMap, { FestivalPin } from '../../src/components/FestivalMap';
 import { TACTICAL_MARKERS } from '../../src/constants/tacticalMarkers';
+import { COLORS, GLASS_STYLE, TYPOGRAPHY } from '../../src/constants/Theme';
 
 // ── Wet trigger items added when attending a 'wet' festival ───────────────────
 
@@ -99,7 +100,7 @@ const FestivalCardBase = ({ festival }: CardBaseProps) => {
   const triggerColour = TRIGGER_COLOURS[festival.trigger] ?? '#FF6B35';
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, GLASS_STYLE]}>
       <View style={styles.cardHeader}>
         <Text style={styles.festivalName}>{festival.festivalName}</Text>
         <View style={[styles.triggerBadge, { borderColor: triggerColour }]}>
@@ -109,8 +110,8 @@ const FestivalCardBase = ({ festival }: CardBaseProps) => {
         </View>
       </View>
 
-      <Text style={styles.country}>{festival.country}</Text>
-      <Text style={styles.dates}>{formatDateRange(festival.startDate, festival.endDate)}</Text>
+      <Text style={[styles.country, TYPOGRAPHY.monoMd]}>{festival.country}</Text>
+      <Text style={[styles.dates, TYPOGRAPHY.monoMd]}>{formatDateRange(festival.startDate, festival.endDate)}</Text>
 
       <TouchableOpacity
         style={[styles.attendButton, festival.isAttending && styles.attendButtonActive]}
@@ -182,7 +183,7 @@ export default function FestivalsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0D0D0D',
+    backgroundColor: COLORS.background,
   },
   containerRow: {
     flexDirection: 'row',
@@ -192,8 +193,8 @@ const styles = StyleSheet.create({
   },
   listWide: {
     maxWidth: 380,
-    borderRightWidth: 1,
-    borderRightColor: '#1E1E1E',
+    borderRightWidth: 0.5,
+    borderRightColor: COLORS.glassBorder,
   },
   listContent: {
     padding: 16,
@@ -209,18 +210,14 @@ const styles = StyleSheet.create({
   },
   mapPanel: {
     height: 320,
-    backgroundColor: '#1A1A1A',
+    backgroundColor: COLORS.surface,
   },
   mapPanelWide: {
     flex: 1,
     height: 'auto' as unknown as number,
   },
   card: {
-    backgroundColor: '#1A1A1A',
-    borderRadius: 12,
     padding: 16,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
     gap: 6,
   },
   cardHeader: {
@@ -230,7 +227,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   festivalName: {
-    color: '#FFFFFF',
+    color: COLORS.textPrimary,
     fontSize: 18,
     fontWeight: '700',
     flex: 1,
@@ -248,13 +245,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   country: {
-    color: '#888',
-    fontSize: 13,
+    opacity: 0.75,
   },
-  dates: {
-    color: '#666',
-    fontSize: 13,
-  },
+  dates: {},
   attendButton: {
     marginTop: 8,
     borderRadius: 8,
