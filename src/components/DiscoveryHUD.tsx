@@ -1,11 +1,17 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Animated,
   FlatList,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { withObservables } from '@nozbe/watermelondb/react';
@@ -13,43 +19,50 @@ import { Q } from '@nozbe/watermelondb';
 import { database } from '../db';
 import { Festival } from '../models/Festival';
 import { TacticalFestivalCard } from './TacticalFestivalCard';
-import { checkZoneProximity, ZoneAlert } from '../logic/GeofenceEngine';
+import { getTacticalZone, TacticalZoneType } from '../logic/GeofenceEngine';
 import { COLORS, TYPOGRAPHY } from '../constants/Theme';
 
-// ── System Alert Banner ───────────────────────────────────────────────────────
+// ── Zone Alert Config ─────────────────────────────────────────────────────────
 
-function SystemAlertBanner({ alert }: { alert: ZoneAlert }) {
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+const ZONE_CONFIG: Record<TacticalZoneType, { color: string; message: string }> = {
+  BLACKOUT_ZONE: {
+    color: '#FF00FF',
+    message: '[!] SIGNAL SHIELD DETECTED: AUTO-CACHING SQUAD DATA',
+  },
+  CROWD_DENSITY_HIGH: {
+    color: '#FF6B35',
+    message: '[!] CROWD DENSITY WARNING: ESTABLISH MEETING POINT NOW',
+  },
+};
+
+// ── Zone Alert Banner ─────────────────────────────────────────────────────────
+
+function ZoneAlertBanner({ zoneType }: { zoneType: TacticalZoneType }) {
+  const { color, message } = ZONE_CONFIG[zoneType];
+  const opacity = useSharedValue(1);
 
   useEffect(() => {
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 0.25,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-      ]),
+    opacity.value = withRepeat(
+      withTiming(0.2, { duration: 700, easing: Easing.inOut(Easing.ease) }),
+      -1,   // infinite
+      true, // reverse on each iteration
     );
-    pulse.start();
-    return () => pulse.stop();
-  }, [pulseAnim]);
+  }, [opacity]);
+
+  const animatedTextStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
 
   return (
-    <Animated.View style={[styles.alertBanner, { opacity: pulseAnim }]}>
-      <View style={styles.alertInner}>
-        <Text style={styles.alertZone}>
-          ⚡ {alert.zone.name.toUpperCase()} · {alert.zone.festivalName.toUpperCase()}
-        </Text>
-        <Text style={styles.alertMessage}>{alert.tacticalMessage}</Text>
-        <Text style={styles.alertDist}>{alert.distanceMeters}m FROM ZONE CENTRE</Text>
-      </View>
-    </Animated.View>
+    <View style={[styles.alertBanner, {
+      backgroundColor: `${color}1A`, // 10% opacity fill
+      borderBottomColor: color,
+      shadowColor: color,
+    }]}>
+      <Animated.Text style={[styles.alertText, { color }, animatedTextStyle]}>
+        {message}
+      </Animated.Text>
+    </View>
   );
 }
 
@@ -86,9 +99,9 @@ type BaseProps = { festivals: Festival[] };
 
 function DiscoveryHUDBase({ festivals }: BaseProps) {
   const router = useRouter();
-  const [activeAlert, setActiveAlert] = useState<ZoneAlert | null>(null);
+  const [activeZone, setActiveZone] = useState<TacticalZoneType | null>(null);
 
-  // ── Passive Radar — watches location, fires geofence checks every 10m ──────
+  // ── Passive Radar — recomputes every 10m of movement ─────────────────────
   useEffect(() => {
     let subscription: Location.LocationSubscription | undefined;
 
@@ -99,17 +112,15 @@ function DiscoveryHUDBase({ festivals }: BaseProps) {
       subscription = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.Balanced,
-          distanceInterval: 10, // only recompute every 10m moved
+          distanceInterval: 10,
         },
         ({ coords }) => {
-          setActiveAlert(checkZoneProximity(coords.latitude, coords.longitude));
+          setActiveZone(getTacticalZone(coords.latitude, coords.longitude));
         },
       );
     })();
 
-    return () => {
-      subscription?.remove();
-    };
+    return () => { subscription?.remove(); };
   }, []);
 
   const handleCardPress = useCallback(
@@ -134,7 +145,7 @@ function DiscoveryHUDBase({ festivals }: BaseProps) {
   return (
     <View style={styles.container}>
       <SystemStatusHeader />
-      {activeAlert && <SystemAlertBanner alert={activeAlert} />}
+      {activeZone && <ZoneAlertBanner zoneType={activeZone} />}
       <FlatList
         data={festivals}
         keyExtractor={keyExtractor}
@@ -170,7 +181,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
 
-  // System Status
+  // Status bar
   statusBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -202,45 +213,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Alert Banner
+  // Alert banner
   alertBanner: {
-    backgroundColor: 'rgba(255, 0, 255, 0.12)',
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.magenta,
-    // iOS glow
-    shadowColor: COLORS.magenta,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  alertInner: {
     paddingHorizontal: 16,
     paddingVertical: 10,
-    gap: 2,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 10,
+    elevation: 6,
   },
-  alertZone: {
+  alertText: {
     fontFamily: 'SpaceMono',
-    fontSize: 9,
-    color: COLORS.magenta,
-    letterSpacing: 2,
+    fontSize: 12,
     fontWeight: '700',
-  },
-  alertMessage: {
-    fontFamily: 'SpaceMono',
-    fontSize: 14,
-    color: COLORS.magenta,
-    fontWeight: '700',
-    letterSpacing: 1.5,
-  },
-  alertDist: {
-    fontFamily: 'SpaceMono',
-    fontSize: 9,
-    color: 'rgba(255, 0, 255, 0.6)',
-    letterSpacing: 1,
+    letterSpacing: 1.2,
   },
 
-  // HUD Header
+  // HUD header
   hudHeader: {
     paddingHorizontal: 4,
     paddingTop: 16,

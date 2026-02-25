@@ -18,79 +18,64 @@ function haversineMeters(
 
 // ── Zone Types ────────────────────────────────────────────────────────────────
 
-export type ZoneAlertType = 'BLACKOUT_RISK' | 'CROWD_CRUSH_RISK';
+export type TacticalZoneType = 'BLACKOUT_ZONE' | 'CROWD_DENSITY_HIGH';
 
-export interface TacticalZone {
+interface ZoneDef {
   id: string;
   name: string;
   festivalName: string;
   lat: number;
   lng: number;
   radiusMeters: number;
-  alertType: ZoneAlertType;
-  tacticalMessage: string;
+  type: TacticalZoneType;
 }
 
-export interface ZoneAlert {
-  zone: TacticalZone;
-  alertType: ZoneAlertType;
-  distanceMeters: number;
-  tacticalMessage: string;
-}
+// ── Zone Registry ─────────────────────────────────────────────────────────────
+// Add zones here as more festival layouts are mapped.
 
-// ── Tactical Zone Registry ────────────────────────────────────────────────────
-// Add new zones here as more festival layouts are mapped.
-
-export const TACTICAL_ZONES: TacticalZone[] = [
+const ZONES: ZoneDef[] = [
   {
     id: 'creamfields-steel-yard',
     name: 'The Steel Yard',
     festivalName: 'Creamfields',
-    lat: 53.336,
-    lng: -2.617,
-    radiusMeters: 100,
-    alertType: 'BLACKOUT_RISK',
-    tacticalMessage: 'SIGNAL SHIELDED: ENGAGE SNEAKERNET',
+    lat: 53.3364,
+    lng: -2.6171,
+    radiusMeters: 150,
+    type: 'BLACKOUT_ZONE',
   },
   {
     id: 'reading-main-stage',
     name: 'The Main Stage',
     festivalName: 'Reading Festival',
-    lat: 51.465,
-    lng: -0.988,
+    lat: 51.4651,
+    lng: -0.9882,
     radiusMeters: 150,
-    alertType: 'CROWD_CRUSH_RISK',
-    tacticalMessage: 'CROWD DENSITY CRITICAL: HOLD POSITION',
+    type: 'CROWD_DENSITY_HIGH',
   },
 ];
 
-// ── checkZoneProximity ────────────────────────────────────────────────────────
-// Call with device GPS coordinates. Returns the nearest active alert, or null.
-// Multiple zones can be active — returns the one the user is deepest inside
-// (smallest distance relative to radius).
+// ── getTacticalZone ───────────────────────────────────────────────────────────
+// Pass device GPS coordinates. Returns the zone type the user is inside,
+// or null if outside all zones. When inside multiple zones, returns the
+// one the user is deepest inside (smallest distance / radius ratio).
 
-export function checkZoneProximity(
+export function getTacticalZone(
   userLat: number,
   userLng: number,
-): ZoneAlert | null {
-  let closest: ZoneAlert | null = null;
-  let closestRatio = Infinity; // lower = deeper inside zone
+): TacticalZoneType | null {
+  let result: TacticalZoneType | null = null;
+  let closestRatio = Infinity;
 
-  for (const zone of TACTICAL_ZONES) {
+  for (const zone of ZONES) {
     const dist = haversineMeters(userLat, userLng, zone.lat, zone.lng);
     if (dist <= zone.radiusMeters) {
       const ratio = dist / zone.radiusMeters;
       if (ratio < closestRatio) {
         closestRatio = ratio;
-        closest = {
-          zone,
-          alertType: zone.alertType,
-          distanceMeters: Math.round(dist),
-          tacticalMessage: zone.tacticalMessage,
-        };
+        result = zone.type;
       }
     }
   }
 
-  return closest;
+  return result;
 }
