@@ -3,6 +3,23 @@ import { schemaMigrations, createTable, addColumns } from '@nozbe/watermelondb/S
 export const migrations = schemaMigrations({
   migrations: [
     {
+      toVersion: 11,
+      steps: [
+        createTable({
+          name: 'emergency_cards',
+          columns: [
+            { name: 'owner_name', type: 'string' },
+            { name: 'blood_type', type: 'string' },
+            { name: 'ice_name', type: 'string' },
+            { name: 'ice_phone', type: 'string' },
+            { name: 'medical_notes', type: 'string' },
+            { name: 'created_at', type: 'number' },
+            { name: 'updated_at', type: 'number' },
+          ],
+        }),
+      ],
+    },
+    {
       toVersion: 10,
       steps: [
         addColumns({

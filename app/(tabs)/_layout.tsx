@@ -1,7 +1,9 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
+import { TouchableOpacity } from 'react-native';
 
 export default function TabLayout() {
+  const router = useRouter();
   return (
     <Tabs
       screenOptions={{
@@ -38,6 +40,14 @@ export default function TabLayout() {
           headerTitle: 'Festival Map',
           tabBarIcon: ({ color }) => (
             <FontAwesome name="map-marker" size={24} color={color} />
+          ),
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => router.push('/emergency-card')}
+              style={{ marginRight: 16 }}
+            >
+              <FontAwesome name="shield" size={22} color="#FF3E3E" />
+            </TouchableOpacity>
           ),
         }}
       />
