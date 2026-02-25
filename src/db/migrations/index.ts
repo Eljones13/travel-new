@@ -3,6 +3,30 @@ import { schemaMigrations, createTable, addColumns } from '@nozbe/watermelondb/S
 export const migrations = schemaMigrations({
   migrations: [
     {
+      toVersion: 10,
+      steps: [
+        addColumns({
+          table: 'festivals',
+          columns: [
+            { name: 'city', type: 'string', isOptional: true },
+            { name: 'vibe', type: 'string', isOptional: true },
+            { name: 'camping', type: 'boolean', isOptional: true },
+            { name: 'expected_attendance', type: 'number', isOptional: true },
+            { name: 'primary_language', type: 'string', isOptional: true },
+            { name: 'medical_doctor', type: 'string', isOptional: true },
+            { name: 'medical_allergy', type: 'string', isOptional: true },
+            { name: 'legal_free_to_go', type: 'string', isOptional: true },
+            { name: 'legal_call_embassy', type: 'string', isOptional: true },
+            { name: 'script_lost_squad', type: 'string', isOptional: true },
+            { name: 'script_substance', type: 'string', isOptional: true },
+            { name: 'script_medical_tent', type: 'string', isOptional: true },
+            { name: 'script_charging', type: 'string', isOptional: true },
+            { name: 'safety_score', type: 'number', isOptional: true },
+          ],
+        }),
+      ],
+    },
+    {
       toVersion: 9,
       steps: [
         createTable({

@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const schema = appSchema({
-  version: 9,
+  version: 10,
   tables: [
     tableSchema({
       name: 'packing_items',
@@ -41,6 +41,7 @@ export const schema = appSchema({
       name: 'festivals',
       columns: [
         { name: 'festival_name', type: 'string' },
+        { name: 'city', type: 'string', isOptional: true },
         { name: 'country', type: 'string' },
         { name: 'start_date', type: 'number' },
         { name: 'end_date', type: 'number' },
@@ -48,6 +49,20 @@ export const schema = appSchema({
         { name: 'lng', type: 'number' },
         { name: 'trigger', type: 'string' },
         { name: 'is_attending', type: 'boolean' },
+        // Discovery HUD fields (v10)
+        { name: 'vibe', type: 'string', isOptional: true },
+        { name: 'camping', type: 'boolean', isOptional: true },
+        { name: 'expected_attendance', type: 'number', isOptional: true },
+        { name: 'primary_language', type: 'string', isOptional: true },
+        { name: 'medical_doctor', type: 'string', isOptional: true },
+        { name: 'medical_allergy', type: 'string', isOptional: true },
+        { name: 'legal_free_to_go', type: 'string', isOptional: true },
+        { name: 'legal_call_embassy', type: 'string', isOptional: true },
+        { name: 'script_lost_squad', type: 'string', isOptional: true },
+        { name: 'script_substance', type: 'string', isOptional: true },
+        { name: 'script_medical_tent', type: 'string', isOptional: true },
+        { name: 'script_charging', type: 'string', isOptional: true },
+        { name: 'safety_score', type: 'number', isOptional: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
       ],
