@@ -1,17 +1,57 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
+  Animated,
   FlatList,
   StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as Location from 'expo-location';
 import { withObservables } from '@nozbe/watermelondb/react';
 import { Q } from '@nozbe/watermelondb';
 import { database } from '../db';
 import { Festival } from '../models/Festival';
 import { TacticalFestivalCard } from './TacticalFestivalCard';
+import { checkZoneProximity, ZoneAlert } from '../logic/GeofenceEngine';
 import { COLORS, TYPOGRAPHY } from '../constants/Theme';
+
+// ── System Alert Banner ───────────────────────────────────────────────────────
+
+function SystemAlertBanner({ alert }: { alert: ZoneAlert }) {
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 0.25,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [pulseAnim]);
+
+  return (
+    <Animated.View style={[styles.alertBanner, { opacity: pulseAnim }]}>
+      <View style={styles.alertInner}>
+        <Text style={styles.alertZone}>
+          ⚡ {alert.zone.name.toUpperCase()} · {alert.zone.festivalName.toUpperCase()}
+        </Text>
+        <Text style={styles.alertMessage}>{alert.tacticalMessage}</Text>
+        <Text style={styles.alertDist}>{alert.distanceMeters}m FROM ZONE CENTRE</Text>
+      </View>
+    </Animated.View>
+  );
+}
 
 // ── System Status Header ──────────────────────────────────────────────────────
 
@@ -46,23 +86,55 @@ type BaseProps = { festivals: Festival[] };
 
 function DiscoveryHUDBase({ festivals }: BaseProps) {
   const router = useRouter();
+  const [activeAlert, setActiveAlert] = useState<ZoneAlert | null>(null);
 
-  const handleCardPress = useCallback((id: string) => {
-    router.push({ pathname: '/festival/[id]', params: { id } });
-  }, [router]);
+  // ── Passive Radar — watches location, fires geofence checks every 10m ──────
+  useEffect(() => {
+    let subscription: Location.LocationSubscription | undefined;
 
-  const renderItem = useCallback(({ item }: { item: Festival }) => (
-    <TacticalFestivalCard
-      festival={item}
-      onPress={() => handleCardPress(item.id)}
-    />
-  ), [handleCardPress]);
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+
+      subscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.Balanced,
+          distanceInterval: 10, // only recompute every 10m moved
+        },
+        ({ coords }) => {
+          setActiveAlert(checkZoneProximity(coords.latitude, coords.longitude));
+        },
+      );
+    })();
+
+    return () => {
+      subscription?.remove();
+    };
+  }, []);
+
+  const handleCardPress = useCallback(
+    (id: string) => {
+      router.push({ pathname: '/festival/[id]', params: { id } });
+    },
+    [router],
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: Festival }) => (
+      <TacticalFestivalCard
+        festival={item}
+        onPress={() => handleCardPress(item.id)}
+      />
+    ),
+    [handleCardPress],
+  );
 
   const keyExtractor = useCallback((item: Festival) => item.id, []);
 
   return (
     <View style={styles.container}>
       <SystemStatusHeader />
+      {activeAlert && <SystemAlertBanner alert={activeAlert} />}
       <FlatList
         data={festivals}
         keyExtractor={keyExtractor}
@@ -97,6 +169,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
+
+  // System Status
   statusBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -127,6 +201,46 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     flex: 1,
   },
+
+  // Alert Banner
+  alertBanner: {
+    backgroundColor: 'rgba(255, 0, 255, 0.12)',
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.magenta,
+    // iOS glow
+    shadowColor: COLORS.magenta,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  alertInner: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 2,
+  },
+  alertZone: {
+    fontFamily: 'SpaceMono',
+    fontSize: 9,
+    color: COLORS.magenta,
+    letterSpacing: 2,
+    fontWeight: '700',
+  },
+  alertMessage: {
+    fontFamily: 'SpaceMono',
+    fontSize: 14,
+    color: COLORS.magenta,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+  },
+  alertDist: {
+    fontFamily: 'SpaceMono',
+    fontSize: 9,
+    color: 'rgba(255, 0, 255, 0.6)',
+    letterSpacing: 1,
+  },
+
+  // HUD Header
   hudHeader: {
     paddingHorizontal: 4,
     paddingTop: 16,
@@ -145,6 +259,8 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 2,
   },
+
+  // List
   listContent: {
     padding: 16,
     paddingTop: 0,
