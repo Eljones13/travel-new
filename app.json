@@ -56,10 +56,13 @@
         {
           "android": {
             "minSdkVersion": 26,
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
             "kotlinVersion": "1.9.25",
             "packagingOptions": {
               "pickFirst": [
-                "**/libc++_shared.so"
+                "**/libc++_shared.so",
+                "**/libfbjni.so"
               ]
             }
           }
