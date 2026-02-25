@@ -56,6 +56,13 @@ export default function RootLayout() {
             presentation: 'card',
           }}
         />
+        <Stack.Screen
+          name="reading-festival"
+          options={{
+            headerShown: false,
+            presentation: 'card',
+          }}
+        />
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="light" />

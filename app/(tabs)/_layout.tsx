@@ -16,10 +16,11 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Pack List',
-          headerTitle: 'Digital Backpack',
+          title: 'HOME',
+          headerTitle: 'COMMAND CENTER',
+          headerTitleStyle: { fontFamily: 'SpaceMono', letterSpacing: 2, fontSize: 14 },
           tabBarIcon: ({ color }) => (
-            <FontAwesome name="suitcase" size={24} color={color} />
+            <FontAwesome name="th-large" size={22} color={color} />
           ),
         }}
       />
