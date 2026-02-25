@@ -38,6 +38,20 @@
       "expo-router",
       "@morrowdigital/watermelondb-expo-plugin",
       [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Squad Pulse needs your location to share your position with crew via QR code.",
+          "locationAlwaysAndWhenInUsePermission": "Squad Pulse needs your location to share your position with crew via QR code."
+        }
+      ],
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "Squad Pulse needs your camera to scan crew QR codes.",
+          "enableCodeScanner": true
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "android": {

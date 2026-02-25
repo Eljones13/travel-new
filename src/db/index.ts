@@ -8,6 +8,7 @@ import { Festival } from '../models/Festival';
 import { SquadSession } from '../models/SquadSession';
 import { Stage } from '../models/Stage';
 import { Performance } from '../models/Performance';
+import { SquadMember } from '../models/SquadMember';
 
 const adapter = new SQLiteAdapter({
   schema,
@@ -23,5 +24,5 @@ const adapter = new SQLiteAdapter({
 
 export const database = new Database({
   adapter,
-  modelClasses: [PackingItem, Festival, SquadSession, Stage, Performance],
+  modelClasses: [PackingItem, Festival, SquadSession, Stage, Performance, SquadMember],
 });

@@ -16,7 +16,9 @@ import { database } from '../../src/db';
 import { SquadSession } from '../../src/models/SquadSession';
 import { PackingItem } from '../../src/models/PackingItem';
 import { Stage } from '../../src/models/Stage';
-import QRDisplay from '../../src/components/QRDisplay';
+import SquadPulse from '../../src/components/SquadPulse';
+import SquadScanner from '../../src/components/SquadScanner';
+import { SquadMember } from '../../src/models/SquadMember';
 import { COLORS, GLASS_STYLE, TYPOGRAPHY, CYAN_GLOW } from '../../src/constants/Theme';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -208,11 +210,14 @@ type ActiveSquadProps = {
   session: SquadSession;
   squadItems: PackingItem[];
   stages: Stage[];
+  squadMembers: SquadMember[];
   onLeave: () => void;
 };
 
-function ActiveSquadView({ session, squadItems, stages, onLeave }: ActiveSquadProps) {
+function ActiveSquadView({ session, squadItems, stages, squadMembers, onLeave }: ActiveSquadProps) {
   const db = useDatabase();
+  const [isSOS, setIsSOS] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
 
   const claimItem = useCallback(async (item: PackingItem) => {
     await db.write(async () => {
@@ -257,20 +262,61 @@ function ActiveSquadView({ session, squadItems, stages, onLeave }: ActiveSquadPr
         </View>
       ) : null}
 
-      {/* QR Code + Code */}
-      <View style={[styles.qrSection, GLASS_STYLE, CYAN_GLOW]}>
-        <Text style={styles.sectionLabel}>RAVE QR — SHARE WITH CREW</Text>
-        <View style={styles.qrRow}>
-          <QRDisplay value={session.squadCode} size={160} />
-          <View style={styles.codeBlock}>
-            <Text style={styles.codeLabel}>CODE</Text>
-            <Text style={styles.bigCode}>{session.squadCode}</Text>
-            <Text style={styles.codeHint}>
-              {squadItems.length} item{squadItems.length !== 1 ? 's' : ''} in squad
-            </Text>
-          </View>
-        </View>
+      {/* Squad Pulse — SneakerNet QR generator */}
+      <SquadPulse session={session} isSOS={isSOS} />
+
+      {/* SOS + Scan row */}
+      <View style={styles.actionRow}>
+        <TouchableOpacity
+          style={[styles.actionBtn, isSOS && styles.actionBtnSOS]}
+          onPress={() => setIsSOS((v) => !v)}
+          activeOpacity={0.75}
+        >
+          <Text style={[styles.actionBtnText, isSOS && styles.actionBtnTextSOS]}>
+            {isSOS ? '⚠ SOS ACTIVE — TAP TO CLEAR' : '⚠ SOS'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.actionBtnScan]}
+          onPress={() => setShowScanner(true)}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.actionBtnScanText}>SCAN CREW</Text>
+        </TouchableOpacity>
       </View>
+
+      {/* Scanned crew positions */}
+      {squadMembers.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>CREW POSITIONS ({squadMembers.length})</Text>
+          {squadMembers.map((member) => (
+            <View key={member.id} style={[styles.memberRow, GLASS_STYLE, CYAN_GLOW]}>
+              <View style={styles.memberInfo}>
+                <Text style={[styles.memberName, member.isSos && styles.memberNameSOS]}>
+                  {member.isSos ? '⚠ ' : ''}{member.displayName}
+                </Text>
+                <Text style={styles.memberCoords}>
+                  {member.lat.toFixed(5)}, {member.lng.toFixed(5)}
+                </Text>
+                <Text style={styles.memberTime}>{timeAgo(member.lastSeenAt)}</Text>
+              </View>
+              {member.isSos && (
+                <View style={styles.sosBadge}>
+                  <Text style={styles.sosText}>SOS</Text>
+                </View>
+              )}
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Scanner overlay */}
+      {showScanner && (
+        <SquadScanner
+          squadCode={session.squadCode}
+          onClose={() => setShowScanner(false)}
+        />
+      )}
 
       {/* Squad Finance */}
       <SquadFinance
@@ -383,9 +429,10 @@ type ScreenBaseProps = {
   sessions: SquadSession[];
   packingItems: PackingItem[];
   stages: Stage[];
+  squadMembers: SquadMember[];
 };
 
-function SquadScreenBase({ sessions, packingItems, stages }: ScreenBaseProps) {
+function SquadScreenBase({ sessions, packingItems, stages, squadMembers }: ScreenBaseProps) {
   const db = useDatabase();
   const session = sessions[0] ?? null;
 
@@ -450,12 +497,14 @@ function SquadScreenBase({ sessions, packingItems, stages }: ScreenBaseProps) {
   }
 
   const squadItems = packingItems.filter((i) => i.squadId === session.squadCode);
+  const filteredMembers = squadMembers.filter((m) => m.squadCode === session.squadCode);
 
   return (
     <ActiveSquadView
       session={session}
       squadItems={squadItems}
       stages={stages}
+      squadMembers={filteredMembers}
       onLeave={handleLeave}
     />
   );
@@ -468,6 +517,7 @@ const EnhancedSquadScreen = withObservables([], () => ({
     .query(Q.sortBy('created_at', Q.asc))
     .observe(),
   stages: database.get<Stage>('stages').query().observe(),
+  squadMembers: database.get<SquadMember>('squad_members').query().observe(),
 }))(SquadScreenBase);
 
 export default function SquadScreen() {
@@ -625,6 +675,74 @@ const styles = StyleSheet.create({
   radarStage: { color: COLORS.cyan, fontWeight: '700' },
   radarAt: { color: COLORS.textSecondary },
   radarTime: { ...TYPOGRAPHY.monoSm, color: COLORS.textSecondary },
+  // SOS + Scan action row
+  actionRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  actionBtn: {
+    flex: 1,
+    borderWidth: 0.5,
+    borderColor: COLORS.glassBorder,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  actionBtnSOS: {
+    backgroundColor: COLORS.orange + '22',
+    borderColor: COLORS.orange,
+  },
+  actionBtnText: {
+    ...TYPOGRAPHY.monoSm,
+    color: COLORS.textSecondary,
+  },
+  actionBtnTextSOS: {
+    color: COLORS.orange,
+    fontWeight: '900',
+  },
+  actionBtnScan: {
+    borderColor: COLORS.cyan,
+    backgroundColor: COLORS.cyan + '15',
+  },
+  actionBtnScanText: {
+    ...TYPOGRAPHY.monoSm,
+    color: COLORS.cyan,
+  },
+  // Crew positions
+  memberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  memberInfo: { flex: 1, gap: 2 },
+  memberName: {
+    ...TYPOGRAPHY.monoMd,
+    color: COLORS.cyan,
+  },
+  memberNameSOS: { color: COLORS.orange },
+  memberCoords: {
+    ...TYPOGRAPHY.monoSm,
+    color: COLORS.textSecondary,
+    fontSize: 10,
+  },
+  memberTime: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
+  },
+  sosBadge: {
+    backgroundColor: COLORS.orange,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  sosText: {
+    color: '#000',
+    fontWeight: '900',
+    fontSize: 11,
+    letterSpacing: 1,
+  },
   // Squad Finance
   financeCard: {
     padding: 16,

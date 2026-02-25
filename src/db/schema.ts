@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const schema = appSchema({
-  version: 8,
+  version: 9,
   tables: [
     tableSchema({
       name: 'packing_items',
@@ -71,6 +71,19 @@ export const schema = appSchema({
         { name: 'end_time', type: 'number' },
         { name: 'genre', type: 'string', isOptional: true },
         { name: 'spotify_preview_url', type: 'string', isOptional: true },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    tableSchema({
+      name: 'squad_members',
+      columns: [
+        { name: 'squad_code', type: 'string' },
+        { name: 'display_name', type: 'string' },
+        { name: 'lat', type: 'number' },
+        { name: 'lng', type: 'number' },
+        { name: 'last_seen_at', type: 'number' },
+        { name: 'is_sos', type: 'boolean' },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
       ],
